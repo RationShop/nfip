@@ -6,10 +6,11 @@ require(stringr)
 
 # read data on policies
 # data from http://bsa.nfipstat.fema.gov/reports/1011.htm
-data_policies <- readLines("nfip_policies.txt")
+data_policies <- readLines("nfip_policies_raw.txt")
 
 # read data on claims
 # data from http://bsa.nfipstat.fema.gov/reports/1040.htm - claims
+
 
 # not formatted for easy use in R
 # all the info related to counties has a fixed width of 116
@@ -27,7 +28,8 @@ state_breaks <- grep(" Total for ", policy_data)
 state_breaks <- c(0, state_breaks)
 
 # identify and clean up data for each state
-out_policies <- NULL # data frame to store policies by county for each state
+out_policies <- NULL # all policies for each state
+
 for (eachState in 1:(length(state_breaks) - 1)) {
   policy_state <- policy_data[(state_breaks[eachState] + 1): 
                               (state_breaks[eachState + 1] - 1)]
@@ -58,10 +60,9 @@ for (eachState in 1:(length(state_breaks) - 1)) {
   }  
   cnty_name <- str_trim(cnty_name)
   
-  # remove whitespaces and commas
+  # remove whitespaces, commas, convert to numeric
   Fn_Remove_Space_Comma <- function(x) {
-    x <- str_trim(x)
-    x <- gsub(",", "", x)
+    x <- gsub(",", "", str_trim(x))
     x <- as.numeric(x)
     return (x)
   }
@@ -70,11 +71,11 @@ for (eachState in 1:(length(state_breaks) - 1)) {
   wri_force <- Fn_Remove_Space_Comma(wri_force)
   
   # add name of state, from record after the last record of the state
-  # record has "Total for xxxxx"
+  # record has "Total for xxxxxxxxxxx"
   state_name <- policy_data[state_breaks[eachState + 1]]
   state_name <- str_trim(substr(state_name, 1, 34))
-  state_name <- unlist(strsplit(state_name, " "))[3]
-  
+  state_name <- gsub("Total for ", "", state_name)
+
   # data frame with all of the state's data
   out_state <- data.frame(state = state_name,
                           county = cnty_name,
@@ -82,8 +83,35 @@ for (eachState in 1:(length(state_breaks) - 1)) {
                           policies = pol_force,
                           insurance = ins_force,
                           premium = wri_force)
-
   # update output
-  out_policies <- rbind(out_policies, out_state)  
+  out_policies <- rbind(out_policies, out_state)    
 }
 
+# write data
+out_policies <- out_policies[order(out_policies$state), ]
+write.table(out_policies,
+            file = "nfip_policies_all.txt",
+            quote = FALSE,
+            sep = "\t",
+            col.names = TRUE,
+            row.names = FALSE,
+            na = "")
+
+# aggregate state data by county
+# consider only the 50 states; remove NAs
+out_policies <- na.omit(out_policies)
+out_policies <- subset(out_policies, state_name %in% c(state.name, "District Columbia"))
+out_policies <- droplevels(out_policies)
+out_policies_agg <- aggregate(cbind(policies, insurance, premium) ~ state * county, 
+                              data = out_policies, 
+                              FUN = sum)
+
+# write data
+out_policies_agg <- out_policies_agg[order(out_policies_agg$state), ]
+write.table(out_policies_agg,
+            file = "nfip_policies_county.txt",
+            quote = FALSE,
+            sep = "\t",
+            col.names = TRUE,
+            row.names = FALSE,
+            na = "")
