@@ -1,4 +1,136 @@
-nfip
-====
+FEMA's Flood Insurance Program - Analysis & Maps using R
+========================================================
 
-Code to plot FEMA's National Flood Insurance Program (NFIP) claims statistics
+The National Flood Insurance Program [(NFIP)](http://en.wikipedia.org/wiki/National_Flood_Insurance_Program) by the Federal Emergency Management Agency (FEMA) in the United States enables property owners in participating communities to purchase insurance protection from the government against losses from flooding. A number of studies in the recent past have analyzed the NFIP and also its feasibility. To my knowledge, there is no readily available code to analyze the [data and other statistics on NFIP provided by FEMA](http://www.fema.gov/policy-claim-statistics-flood-insurance/policy-claim-statistics-flood-insurance/policy-claim-13). 
+
+Some relevant links:
+* [Report on flood insurance by the Union of Concerned Scientists](http://www.ucsusa.org/global_warming/science_and_impacts/impacts/flood-insurance-sea-level-rise.html)
+* [Analysis of NFIP claims and policies by Institute for Policy Integrity, NY](http://policyintegrity.org/documents/FloodingtheMarket.pdf)
+
+
+Here is my attempt to clean and format the data from FEMA and also here are some interesting graphics.
+
+I wanted to make these maps interactive using googleVis, but googleVis does not seem to have the capability to do so at the resolution of a county.
+
+All my code and data are available from here - https://github.com/RationShop/nfip
+
+
+
+```r
+# analyze policies and claims data from NFIP for each county FEMA NFIP
+# policies and claims stats from (Policy & Claim Statistics for Flood
+# Insurance)
+# http://www.fema.gov/policy-claim-statistics-flood-insurance/policy-claim-statistics-flood-insurance/policy-claim-13
+
+# required libraries
+library(stringr)
+```
+
+```
+## Warning: package 'stringr' was built under R version 3.0.2
+```
+
+```r
+library(ggplot2)
+
+# required functions
+source("analyze_policies.R")  # function to preprocess policies data
+source("analyze_claims.R")  # function to preprocess claims data
+```
+
+
+policies data
+
+```r
+policies <- Fn_Analyze_Policies()
+```
+
+```
+## reading policies by county file dated -  2013-10-20 09:45:46
+```
+
+
+claims data
+
+```r
+claims <- Fn_Analyze_Claims()
+```
+
+```
+## reading claims by county file dated -  2013-10-20 09:44:26
+```
+
+
+combine county data on policies and claims
+
+```r
+all_data <- merge(policies, claims, by = c("state", "county"), all = TRUE)
+# convert state and county names to be consistent with ggplot2
+all_data$state <- tolower(all_data$state)
+all_data$county <- tolower(all_data$county)
+# remove ' county' and ' parish' from county names
+all_data$county <- gsub(" county", "", all_data$county)
+all_data$county <- gsub(" parish", "", all_data$county)
+```
+
+
+geo referencing info on counties and states
+
+```r
+geo_county <- map_data("county")
+names(geo_county) <- c("long", "lat", "group", "order", "state", "county")
+geo_state <- map_data("state")
+```
+
+
+data for graphics
+
+```r
+gfx_data <- merge(geo_county, all_data, by = c("state", "county"))
+gfx_data <- gfx_data[order(gfx_data$order), ]
+# discretise variables of interest
+gfx_data$policies_gfx <- cut(gfx_data$policies, breaks = c(1, 30, 100, 300, 
+    1000, 10000, 4e+05), labels = c("1 - 30", "30 - 100", "100 - 300", "300 - 1k", 
+    "1k - 10k", "10k - 400k"))
+gfx_data$payments_gfx <- cut(gfx_data$total_pay/10^6, breaks = c(0, 0.05, 0.4, 
+    1.7, 6.3, 50, 7300), labels = c("0 - 50k", "50k - 400k", "400k - 1.7M", 
+    "1.7M - 6.3M", "6.3M - 50M", "50M - 7.3B"))
+```
+
+
+plot policies
+
+```r
+plot_map <- ggplot(data = gfx_data) + geom_polygon(aes(long, lat, group = group, 
+    fill = policies_gfx)) + geom_path(data = geo_state, aes(x = long, y = lat, 
+    group = group), fill = NA, na.rm = TRUE) + labs(list(title = "NFIP Policies Per County", 
+    x = NULL, y = NULL)) + guides(fill = guide_legend(title = "Policies Per County")) + 
+    scale_fill_brewer(palette = "Accent")
+# save plot
+png("nfip_policies.png", width = 10, height = 8, units = "in", res = 72)
+print(plot_map)
+garbage <- dev.off()
+```
+
+![figure 1] [nfip1]
+
+
+plot payments
+
+```r
+plot_map <- ggplot(data = gfx_data) + geom_polygon(aes(long, lat, group = group, 
+    fill = payments_gfx)) + geom_path(data = geo_state, aes(x = long, y = lat, 
+    group = group), fill = NA, na.rm = TRUE) + labs(list(title = "NFIP Payments Per County (US$)", 
+    x = NULL, y = NULL)) + guides(fill = guide_legend(title = "Payments Per County (US$)")) + 
+    scale_fill_brewer(palette = "Accent")
+png("nfip_payments.png", width = 10, height = 8, units = "in", res = 72)
+print(plot_map)
+garbage <- dev.off()
+```
+
+![figure 2] [nfip2]
+
+
+
+[nfip1]: nfip_policies.png "figure 1"
+[nfip2]: nfip_payments.png "figure 2"
