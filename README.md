@@ -105,7 +105,7 @@ plot_map <- ggplot(data = gfx_data) + geom_polygon(aes(long, lat, group = group,
     fill = policies_gfx)) + geom_path(data = geo_state, aes(x = long, y = lat, 
     group = group), fill = NA, na.rm = TRUE) + labs(list(title = "NFIP Policies Per County", 
     x = NULL, y = NULL)) + guides(fill = guide_legend(title = "Policies Per County")) + 
-    scale_fill_brewer(palette = "Accent")
+    scale_fill_brewer(palette = "Accent") + coord_fixed()
 # save plot
 png("nfip_policies.png", width = 10, height = 8, units = "in", res = 72)
 print(plot_map)
@@ -122,7 +122,7 @@ plot_map <- ggplot(data = gfx_data) + geom_polygon(aes(long, lat, group = group,
     fill = payments_gfx)) + geom_path(data = geo_state, aes(x = long, y = lat, 
     group = group), fill = NA, na.rm = TRUE) + labs(list(title = "NFIP Payments Per County (US$)", 
     x = NULL, y = NULL)) + guides(fill = guide_legend(title = "Payments Per County (US$)")) + 
-    scale_fill_brewer(palette = "Accent")
+    scale_fill_brewer(palette = "Accent") + coord_fixed()
 png("nfip_payments.png", width = 10, height = 8, units = "in", res = 72)
 print(plot_map)
 garbage <- dev.off()
